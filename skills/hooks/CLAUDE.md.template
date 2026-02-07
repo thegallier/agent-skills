@@ -1,0 +1,15 @@
+## General Instructions
+
+- Do not push to github without explicit user approval
+- Do NOT commit to github without approval
+
+## Project Documentation Standard
+
+Every project MUST have these four files. If any are missing, create them. If stale, update them.
+
+- **README.md** — What the project does, features, architecture, usage
+- **INSTALLATION.md** — How to install and run (always use uv for Python: `uv venv`, `uv pip install`)
+- **METHODS.md** — Algorithms, technical approaches, key design decisions with rationale
+- **TODO.md** — Outstanding issues (manually curated priorities at top, auto-appended session history at bottom)
+
+When completing significant work on a project, check that all four docs exist and are current. See the `/development` skill Phase 9 for full templates and rules.
