@@ -182,7 +182,9 @@ IF ~/.claude/hooks/damage-control/patterns.yaml does NOT exist:
 **Goal**: Comprehensive understanding of relevant existing code
 
 **Actions**:
-1. Launch 2-3 code-explorer agents **in parallel**. Each agent should:
+1. **Check for existing codebase index first**: Look for `CODEBASE_INDEX.md` in the project root. If it exists, read it before launching explorer agents — it may already answer your questions.
+
+2. Launch 2-3 code-explorer agents **in parallel**. Each agent should:
    - **Study** the code comprehensively (trace through abstractions, architecture, control flow)
    - Target different aspects (similar features, architecture, user experience)
    - Return a list of 5-10 key files to read
@@ -192,14 +194,76 @@ IF ~/.claude/hooks/damage-control/patterns.yaml does NOT exist:
    - "Map the architecture and abstractions for [area], studying the code comprehensively"
    - "Analyze how [existing feature] works end-to-end, identifying patterns and conventions"
 
-2. **Read all files identified by agents** to build deep understanding
+3. **Read all files identified by agents** to build deep understanding
 
-3. **Critical Guard**: Don't assume something isn't implemented. Always verify:
+4. **Critical Guard**: Don't assume something isn't implemented. Always verify:
    - Search for existing implementations before creating new ones
    - Look for utilities, helpers, and patterns already in the codebase
    - Check for partial implementations that can be extended
 
-4. Present comprehensive summary of findings
+5. Present comprehensive summary of findings
+
+### Phase 2b: Codebase Indexing (Optional — on user request or for large codebases)
+
+**Goal**: Create a persistent, verified codebase index that accelerates all future work
+
+When the user requests "index the code" or the codebase is large enough to warrant it:
+
+**Step 1: Index Generation**
+
+Launch 2-4 code-explorer agents **in parallel**, each covering different layers:
+- Agent 1: Core server/application layer
+- Agent 2: Data layer, storage, APIs
+- Agent 3: Infrastructure, tests, tooling
+- Agent 4: Integrations, plugins, auxiliary systems
+
+Each agent must report for every file:
+- **Actual class names** (grep for `class ` — do NOT infer or guess names)
+- **Actual function/method names** (grep for `def ` — do NOT infer or guess names)
+- **Actual LOC** (use `wc -l` — do NOT estimate)
+- **Actual line numbers** for key definitions (grep with `-n` flag)
+- Purpose and integration points
+
+**Critical indexing rules to prevent common errors:**
+- **Never guess class names.** The class may be `KanbanHandler`, not `KanbanHTTPRequestHandler`. Always verify with grep.
+- **Never guess function names.** A function may or may not have underscore prefixes. Always verify.
+- **Always use `wc -l` for LOC.** Agent estimates are unreliable.
+- **Verify singleton/global instances exist** by grepping for the actual assignment.
+- **Count items precisely** (e.g., agent types, endpoints) — don't round or approximate.
+- **Check both current and disabled/old files** — flag which is active vs deprecated.
+
+**Step 2: Write the Index**
+
+Create `CODEBASE_INDEX.md` in the project root with these sections:
+1. Directory structure overview
+2. File table (path, LOC, purpose) per subsystem
+3. Class registry (class name, file:line, purpose)
+4. Key functions by domain (method, line, purpose)
+5. API endpoints reference
+6. State files and persistence model
+7. Naming conventions
+8. Singleton instances
+9. Known technical debt
+
+**Step 3: Verification (REQUIRED)**
+
+Launch 2-3 verification agents **in parallel** to spot-check the index against actual source:
+- Each agent checks different files from the index
+- For each file, verify: actual LOC (via `wc -l`), class names exist, method names exist, line numbers are within ~20 lines
+- Report any inaccuracies
+
+**Step 4: Fix Inaccuracies**
+
+Apply all corrections found by verification agents. Common issues to watch for:
+- Class names that don't match (e.g., abbreviated vs full names)
+- Function name prefix mismatches (underscore vs no underscore)
+- Feature flags or constants that moved between files
+- Off-by-one in item counts
+- Files that reference old/disabled code paths
+
+**Step 5: Update CLAUDE.md**
+
+Add a section to the project's CLAUDE.md instructing to always check `CODEBASE_INDEX.md` before searching the codebase, and to update the index when discovering new things not covered by it.
 
 ---
 
@@ -443,7 +507,221 @@ This gives 3x speedup for independent work.
 
 ---
 
-## Phase 9: Summary
+## Phase 9: Project Documentation
+
+**Goal**: Ensure every project has complete, up-to-date documentation
+
+Every project MUST have these four files in the project root. Create them if missing, update them if stale.
+
+### 9a: README.md
+
+**Purpose**: Describes what the project does and its key functionality.
+
+**Template structure**:
+```markdown
+# Project Name
+
+One-paragraph description of what this project does and the problem it solves.
+
+## Features
+
+- Feature 1: Brief description
+- Feature 2: Brief description
+
+## Architecture
+
+High-level overview of how the system works (components, data flow, key technologies).
+Include a diagram if the system has 3+ interacting components.
+
+## Usage
+
+How to run and use the project after installation. Key commands, endpoints, or UI entry points.
+
+## Ports / Services (if applicable)
+
+| Port | Service | Required |
+|------|---------|----------|
+| 8080 | Main server | Yes |
+
+## Configuration
+
+Environment variables, config files, and their purposes.
+
+## License
+```
+
+**Rules**:
+- Focus on WHAT and WHY, not HOW to install (that's INSTALLATION.md)
+- Don't duplicate the installation steps
+- Keep it concise — link to other docs for details
+- Include actual feature list, not aspirational features
+
+### 9b: INSTALLATION.md
+
+**Purpose**: Step-by-step guide to get the project running from a fresh clone.
+
+**Always prefer uv** for Python dependency management. Structure:
+
+```markdown
+# Installation
+
+## Prerequisites
+
+List exact versions required (Python 3.11+, Node 18+, etc.)
+
+## Quick Start with uv
+
+### 1. Install uv
+
+\```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Or: brew install uv
+\```
+
+### 2. Clone and setup
+
+\```bash
+git clone <repo-url>
+cd <project-name>
+uv venv --python 3.11
+source .venv/bin/activate
+uv pip install <dependencies>
+\```
+
+### 3. Start
+
+\```bash
+./start.sh  # or whatever the entry point is
+\```
+
+## All-in-one install (copy-paste)
+
+Single block the user can paste to go from zero to running.
+
+## Component Details
+
+For each optional component/service, show how to start it independently.
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| ... | ... | ... |
+
+## Running Tests
+
+Exact commands to run the test suite. Include single-test examples.
+
+## Troubleshooting
+
+Common issues and their fixes (kill stuck processes, reset databases, etc.)
+```
+
+**Rules**:
+- Every dependency must be explicitly listed with its install command
+- Include a copy-pasteable all-in-one block
+- Use `uv pip install` not `pip install`
+- Use `uv venv --python 3.11` not `python -m venv`
+- Test the instructions mentally — would a new developer succeed on first try?
+
+### 9c: METHODS.md
+
+**Purpose**: Explains the algorithms, methods, and technical approaches used in the project.
+
+**Template structure**:
+```markdown
+# Methods & Algorithms
+
+## Overview
+
+Brief description of the technical approach and why these methods were chosen.
+
+## [Method/Algorithm 1 Name]
+
+### Purpose
+What problem this method solves.
+
+### How It Works
+Step-by-step explanation of the algorithm. Include pseudocode or key code
+references (file:line) for complex logic.
+
+### Parameters / Configuration
+Tunable parameters and their effects.
+
+### Trade-offs
+Why this approach was chosen over alternatives. Performance characteristics.
+
+## [Method/Algorithm 2 Name]
+...
+
+## Data Flow
+
+How data moves through the system. Key transformations and storage points.
+
+## Key Design Decisions
+
+| Decision | Chosen Approach | Alternatives Considered | Rationale |
+|----------|----------------|------------------------|-----------|
+| ... | ... | ... | ... |
+```
+
+**Rules**:
+- Focus on NON-OBVIOUS technical decisions — don't document standard CRUD
+- Reference actual code locations (file:line) for key implementations
+- Explain the WHY behind algorithm choices
+- Include complexity analysis (O(n), etc.) for performance-critical algorithms
+- If using external papers/references, cite them
+- Update when algorithms change
+
+### 9d: TODO.md
+
+**Purpose**: Living document of outstanding issues, tracked automatically and manually.
+
+The `SessionEnd` hook automatically appends outstanding issues from each Claude Code session. During the documentation phase, also:
+
+1. **Review existing TODO.md** — remove items that have been completed
+2. **Add any known issues** discovered during development that weren't captured
+3. **Organize by priority** if the file has grown large
+4. **Cross-reference** with the task system (TaskList) to ensure consistency
+
+**Format**:
+```markdown
+# TODO
+
+Outstanding issues and planned work.
+
+## High Priority
+- [ ] Critical bug or feature
+
+## Medium Priority
+- [ ] Enhancement or improvement
+
+## Low Priority
+- [ ] Nice-to-have or cleanup
+
+## Session History
+(Auto-appended by SessionEnd hook — do not edit this section manually)
+```
+
+**Rules**:
+- Keep the manually-curated sections at the top
+- Let the SessionEnd hook manage the "Session History" section at the bottom
+- Remove completed items promptly — TODO.md should reflect CURRENT state
+- Don't duplicate items between manual and auto-generated sections
+
+### Documentation Checklist
+
+Before marking Phase 9 complete, verify:
+- [ ] README.md exists and accurately describes the project
+- [ ] INSTALLATION.md exists with uv-based setup and works from a fresh clone
+- [ ] METHODS.md exists and documents non-trivial algorithms/approaches
+- [ ] TODO.md exists and reflects current outstanding issues
+- [ ] No stale or incorrect information in any doc
+- [ ] All docs reference actual file paths, not guessed ones
+
+---
+
+## Phase 10: Summary
 
 **Goal**: Document accomplishments and next steps
 
@@ -545,6 +823,14 @@ When things go wrong:
 - **Skipping dependencies** by not using blockedBy properly
 - **Vague task descriptions** that require re-reading the conversation
 - **Using opus for everything** when haiku/sonnet would suffice
+
+### Indexing Anti-Patterns
+- **Guessing class/function names** instead of grepping for `class ` or `def ` — names are often abbreviated or differ from what you'd expect (e.g., `KanbanHandler` not `KanbanHTTPRequestHandler`)
+- **Estimating LOC** instead of using `wc -l` — always use actual counts
+- **Listing a file with only LOC** but no classes/methods — every indexed file should have its public API documented
+- **Assuming feature flags or constants are in the current file** — they may have moved to a disabled/old version of the file
+- **Not verifying the index** — always run verification agents after generating an index; unverified indexes propagate errors to all future work
+- **Rounding counts** (e.g., "19 agent types" when there are 20) — always count precisely
 
 ---
 
