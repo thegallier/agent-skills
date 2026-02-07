@@ -115,11 +115,11 @@ The architecture has no built-in ceiling. Constraints are context and cost, not 
 
 ---
 
-## Phase 0: Requirements Definition
+## Phase 0: Requirements Definition & Codebase Indexing
 
-**Goal**: Establish clear Jobs to Be Done (JTBD)
+**Goal**: Establish clear Jobs to Be Done (JTBD) and build a searchable codebase index
 
-**Pre-flight Safety Check** (run first):
+### Pre-flight: Safety Check
 1. Verify damage control hooks are installed:
    ```bash
    # Check if hooks exist
@@ -141,6 +141,48 @@ IF ~/.claude/hooks/damage-control/patterns.yaml does NOT exist:
     VERIFY hooks are now installed
     THEN continue with Phase 0
 ```
+
+### Pre-flight: Codebase Indexing
+
+**ALWAYS run indexing at the start of a session in any repo.** This builds a searchable map of the entire codebase — files, symbols, and dependency graph — so you can search instead of reading every file.
+
+1. **Run the indexer** (indexes full repo path + all tracked/untracked files):
+   ```bash
+   bash "$(find ~/.claude -path '*/development/scripts/index-repo.sh' -type f 2>/dev/null | head -1)" "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+   ```
+   Falls back to `pwd` if not in a git repo. Indexes:
+   - **file-tree.txt**: Every file with size and full path
+   - **dir-tree.txt**: Directory structure (4 levels deep)
+   - **symbols.txt**: All functions, classes, types, interfaces, exports with file:line
+   - **dependencies.txt**: Import/require map between files
+
+2. **Read the summary** to orient yourself:
+   ```
+   Read .claude/repo-index/SUMMARY.md
+   ```
+
+3. **Re-index when needed**: After major file additions/deletions or at the start of each new session.
+
+### Using the Index During Development
+
+The index replaces blind file reading. Instead of exploring every directory:
+
+| Want to find... | Search command |
+|-----------------|---------------|
+| A function by name | `grep 'functionName' .claude/repo-index/symbols.txt` |
+| Files in a directory | `grep 'dirname/' .claude/repo-index/file-tree.txt` |
+| Who imports a module | `grep 'module-name' .claude/repo-index/dependencies.txt` |
+| All React components | `grep 'FUNC.*\.tsx' .claude/repo-index/symbols.txt` |
+| All type definitions | `grep '^TYPE\|^IFACE' .claude/repo-index/symbols.txt` |
+| All exports from a file | `grep 'filename.ts' .claude/repo-index/symbols.txt` |
+| Files by extension | `grep '\.py$' .claude/repo-index/file-tree.txt` |
+| Large files (potential targets) | Sort file-tree.txt by size column |
+
+**Context efficiency**: Searching the index uses ~100 tokens. Reading a file uses ~2000+ tokens. For a 20-file exploration, that's **95% token savings**.
+
+**Rule**: Always search the index BEFORE using Glob/Grep on the actual codebase. Only read files you've confirmed are relevant via the index.
+
+### Requirements Definition
 
 **Actions**:
 1. Discuss the feature/task with the user
@@ -182,24 +224,31 @@ IF ~/.claude/hooks/damage-control/patterns.yaml does NOT exist:
 **Goal**: Comprehensive understanding of relevant existing code
 
 **Actions**:
-1. Launch 2-3 code-explorer agents **in parallel**. Each agent should:
+1. **Search the index first** (before launching agents):
+   - Search `symbols.txt` for functions/types related to the feature
+   - Search `dependencies.txt` to trace the import graph
+   - Search `file-tree.txt` to identify relevant directories
+   - This gives you a targeted file list in seconds, saving agent context
+
+2. Launch 2-3 code-explorer agents **in parallel**. Each agent should:
    - **Study** the code comprehensively (trace through abstractions, architecture, control flow)
    - Target different aspects (similar features, architecture, user experience)
+   - **Start by reading `.claude/repo-index/symbols.txt`** to orient themselves
    - Return a list of 5-10 key files to read
 
    **Example agent prompts**:
-   - "Study features similar to [feature], tracing through their complete implementation"
-   - "Map the architecture and abstractions for [area], studying the code comprehensively"
-   - "Analyze how [existing feature] works end-to-end, identifying patterns and conventions"
+   - "Read .claude/repo-index/symbols.txt first, then study features similar to [feature], tracing through their complete implementation"
+   - "Read .claude/repo-index/dependencies.txt, then map the architecture and abstractions for [area]"
+   - "Search .claude/repo-index/symbols.txt for [keyword], then analyze how [existing feature] works end-to-end"
 
-2. **Read all files identified by agents** to build deep understanding
+3. **Read all files identified by agents** to build deep understanding
 
-3. **Critical Guard**: Don't assume something isn't implemented. Always verify:
-   - Search for existing implementations before creating new ones
-   - Look for utilities, helpers, and patterns already in the codebase
+4. **Critical Guard**: Don't assume something isn't implemented. Always verify:
+   - Search `symbols.txt` for existing implementations before creating new ones
+   - Search `dependencies.txt` for utilities and helpers already in the codebase
    - Check for partial implementations that can be extended
 
-4. Present comprehensive summary of findings
+5. Present comprehensive summary of findings
 
 ---
 
@@ -507,14 +556,16 @@ This gives 3x speedup for independent work.
 
 To maximize effective use of context window:
 
-1. **Parallel subagents for reading**: Launch multiple explorers simultaneously
-2. **Single subagent for builds/tests**: Controlled backpressure, clear signal
-3. **Atomic tasks**: One task per focused session prevents context bloat
-4. **Progressive disclosure**: Load detailed docs only when needed
-5. **File lists from agents**: Have agents return key files, then read them yourself
-6. **Task descriptions as context**: Put full context in task description so sub-agents don't need conversation history
-7. **Externalize the plan**: The task graph holds the plan, not your working memory
-8. **Model selection**: Use haiku for simple tasks, save opus for complex reasoning
+1. **Index-first search**: Always search `.claude/repo-index/` before Glob/Grep on actual files. Index searches cost ~100 tokens vs ~2000+ for file reads. This alone saves 90%+ tokens on exploration.
+2. **Parallel subagents for reading**: Launch multiple explorers simultaneously
+3. **Single subagent for builds/tests**: Controlled backpressure, clear signal
+4. **Atomic tasks**: One task per focused session prevents context bloat
+5. **Progressive disclosure**: Load detailed docs only when needed
+6. **File lists from agents**: Have agents return key files, then read them yourself
+7. **Task descriptions as context**: Put full context in task description so sub-agents don't need conversation history
+8. **Externalize the plan**: The task graph holds the plan, not your working memory
+9. **Model selection**: Use haiku for simple tasks, save opus for complex reasoning
+10. **Re-index after major changes**: Run the indexer again after adding/removing many files to keep the search accurate
 
 ## Self-Correction Patterns
 
@@ -600,3 +651,115 @@ When things go wrong:
 1. **One-time exception**: User runs command manually outside Claude
 2. **Repeated need**: Add `ask: true` pattern to get confirmation dialog
 3. **False positive**: Remove pattern from `bashToolPatterns` in patterns.yaml
+
+---
+
+## Data Backup Guidelines
+
+**CRITICAL**: Always backup data before destructive operations. Data loss is often irreversible.
+
+### When to Backup
+
+| Operation | Backup Required | Why |
+|-----------|-----------------|-----|
+| Database reset/clear | **YES** | All data will be lost |
+| Schema migrations | **YES** | May corrupt or lose data |
+| Testing with production data | **YES** | Tests may modify data |
+| Major refactors | Recommended | Code changes may have side effects |
+| Before experiments | **YES** | Experiments often fail |
+
+### Backup Commands
+
+#### SQLite Databases
+```bash
+# Simple copy (database must not be in use, or use WAL mode)
+cp /path/to/database.db /path/to/database.db.backup.$(date +%Y%m%d_%H%M%S)
+
+# Safe backup with sqlite3 (works even if db is in use)
+sqlite3 /path/to/database.db ".backup '/path/to/database.db.backup.$(date +%Y%m%d_%H%M%S)'"
+
+# Dump to SQL (portable, can restore to different SQLite version)
+sqlite3 /path/to/database.db .dump > /path/to/database.sql.backup.$(date +%Y%m%d_%H%M%S)
+```
+
+#### PostgreSQL
+```bash
+pg_dump dbname > backup_$(date +%Y%m%d_%H%M%S).sql
+pg_dump -Fc dbname > backup_$(date +%Y%m%d_%H%M%S).dump  # Custom format, compressed
+```
+
+#### MongoDB
+```bash
+mongodump --db dbname --out backup_$(date +%Y%m%d_%H%M%S)
+```
+
+#### Generic Files/Directories
+```bash
+# Timestamped copy
+cp -r /path/to/data /path/to/data.backup.$(date +%Y%m%d_%H%M%S)
+
+# Compressed archive
+tar -czf backup_$(date +%Y%m%d_%H%M%S).tar.gz /path/to/data
+```
+
+### Auto-Backup Before Destructive Operations
+
+**Before any of these operations, CREATE A BACKUP FIRST:**
+
+1. **Database resets** (`DELETE FROM`, `DROP TABLE`, `TRUNCATE`)
+2. **API calls to `/reset` endpoints**
+3. **Migration rollbacks**
+4. **Data imports that replace existing data**
+5. **Testing new extraction/processing logic**
+
+### Backup Verification
+
+After creating a backup, verify it:
+```bash
+# Check file exists and has size
+ls -la /path/to/backup.db
+
+# For SQLite, verify integrity
+sqlite3 /path/to/backup.db "PRAGMA integrity_check;"
+
+# Count records to verify data
+sqlite3 /path/to/backup.db "SELECT COUNT(*) FROM main_table;"
+```
+
+### Restore Commands
+
+```bash
+# SQLite - restore from copy
+cp /path/to/backup.db /path/to/database.db
+
+# SQLite - restore from SQL dump
+sqlite3 /path/to/database.db < /path/to/backup.sql
+
+# PostgreSQL
+psql dbname < backup.sql
+pg_restore -d dbname backup.dump
+```
+
+### Quick Reference: Backup Before Destructive Ops
+
+| Destructive Operation | Backup Command |
+|-----------------------|----------------|
+| `curl -X POST /api/reset` | `sqlite3 $DB ".backup '$DB.bak.$(date +%s)'"` |
+| `DELETE FROM table` | `sqlite3 $DB ".backup '$DB.bak.$(date +%s)'"` |
+| Schema migration | `sqlite3 $DB .dump > schema_backup.sql` |
+| Fresh import | `cp $DB $DB.pre_import.$(date +%s)` |
+
+### Environment Variable for Database Path
+
+To make backups easier, know your database path:
+```bash
+# Check .env files for database location
+grep -r "DB_PATH\|DATABASE\|SQLITE" .env*
+
+# Common locations:
+# - MEMORY_DB_PATH (this project)
+# - DATABASE_URL
+# - SQLITE_PATH
+```
+
+**Remember**: It takes seconds to backup, hours to re-process lost data.
