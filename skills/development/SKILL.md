@@ -30,6 +30,8 @@ A comprehensive development methodology that combines structured feature develop
 - **Backpressure steering**: Tests, builds, and lints guide self-correction
 - **Context efficiency**: Parallel subagents for reading, single agent for builds
 - **Capture the why**: Document reasoning alongside implementation
+- **Push back when warranted**: If a request seems counterproductive, over-scoped, or based on incorrect assumptions, say so and recommend an alternative before proceeding
+- **Surgical changes only**: Touch only what the request requires. Don't improve adjacent code, reformat untouched lines, or refactor things that aren't broken
 
 ### From Task System / Agent Swarms
 - **Tasks as coordination layer**: Not just todos—a way to orchestrate multiple agents with shared state
@@ -384,6 +386,19 @@ If user says "whatever you think is best", provide your recommendation and get e
    - Use TaskList to see what unblocked
 
 7. Follow codebase conventions strictly
+
+### Change Discipline
+
+Every changed line must trace directly to the user's request:
+
+1. **Scope**: Only modify files and code paths required by the task. Do not "improve" adjacent code, comments, or formatting
+2. **Simplicity**: Write the minimum code that solves the problem. No speculative flexibility, no abstractions for single-use code, no error handling for impossible scenarios. If 200 lines could be 50, rewrite. Ask: "Would a senior engineer say this is overcomplicated?"
+3. **Dead code**: Remove imports, variables, and functions that YOUR changes made unused. Do not remove pre-existing dead code unless asked — mention it in review notes instead
+4. **Style**: Match existing codebase conventions exactly. Do not introduce new patterns unless the task requires it
+5. **Goal framing**: Before implementing, restate the task as a verifiable goal:
+   - "Add validation" → "Write tests for invalid inputs, then make them pass"
+   - "Fix the bug" → "Write a test that reproduces it, then make it pass"
+   - "Refactor X" → "Ensure tests pass before and after"
 
 **Backpressure Loop**: Failing checks are steering signals. The build-error-resolver agent specializes in diagnosing and fixing these failures quickly.
 
@@ -810,6 +825,10 @@ When things go wrong:
 - **Skipping dependencies** by not using blockedBy properly
 - **Vague task descriptions** that require re-reading the conversation
 - **Using opus for everything** when haiku/sonnet would suffice
+- Touching code unrelated to the current task ("while I'm here" refactoring)
+- Removing pre-existing dead code, unused imports, or legacy comments not caused by your changes
+- Adding speculative error handling, flexibility, or abstractions "in case we need it later"
+- Implementing without first restating the task as a verifiable goal
 
 ### Indexing Anti-Patterns
 - **Guessing class/function names** instead of grepping for `class ` or `def ` — names are often abbreviated or differ from what you'd expect (e.g., `KanbanHandler` not `KanbanHTTPRequestHandler`)
