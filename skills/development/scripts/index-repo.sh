@@ -69,6 +69,37 @@ poetry.lock
 *.db
 *.sqlite3
 *.tsbuildinfo
+# ML model files
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.bin
+*.h5
+*.hdf5
+*.ckpt
+*.pkl
+*.pickle
+*.joblib
+*.npy
+*.npz
+*.mat
+# PDF / documents
+*.pdf
+# Notebooks checkpoints
+*.ipynb_checkpoints
+# C/C++ headers (often from pip packages in .venv)
+*.h
+*.hpp
+*.c
+*.cpp
+*.cuh
+# Protobuf compiled
+*_pb2.py
+*_pb2.pyi
+*_pb2_grpc.py
+# Type stubs (vendored in .venv)
+*.pyi
 IGNORE_EOF
   echo "  Created default .indexignore"
 fi
@@ -101,6 +132,15 @@ FILE_TREE="$INDEX_DIR/file-tree.txt"
     -not -path '*/__pycache__/*' \
     -not -path '*/target/*' \
     -not -path '*/.turbo/*' \
+    -not -path '*/.venv/*' \
+    -not -path '*/venv/*' \
+    -not -path '*/.env/*' \
+    -not -path '*/env/*' \
+    -not -path '*/.tox/*' \
+    -not -path '*/.mypy_cache/*' \
+    -not -path '*/.pytest_cache/*' \
+    -not -path '*/.ruff_cache/*' \
+    -not -path '*/*.egg-info/*' \
     "${FIND_EXCLUDES[@]}" \
     2>/dev/null | sort | while IFS= read -r f; do
       rel="${f#$REPO_ROOT/}"
@@ -120,7 +160,7 @@ DIR_TREE="$INDEX_DIR/dir-tree.txt"
   echo "# Root: $REPO_ROOT"
   echo ""
   if command -v tree &>/dev/null; then
-    tree -d -L 4 --noreport -I 'node_modules|.git|.next|dist|__pycache__|.claude|target|.turbo' "$REPO_ROOT" 2>/dev/null || true
+    tree -d -L 4 --noreport -I 'node_modules|.git|.next|dist|__pycache__|.claude|target|.turbo|.venv|venv|.env|env|.tox|.mypy_cache|.pytest_cache|.ruff_cache|*.egg-info' "$REPO_ROOT" 2>/dev/null || true
   else
     find "$REPO_ROOT" -type d -maxdepth 4 \
       -not -path '*/node_modules/*' \
@@ -129,6 +169,15 @@ DIR_TREE="$INDEX_DIR/dir-tree.txt"
       -not -path '*/dist/*' \
       -not -path '*/__pycache__/*' \
       -not -path '*/.claude/repo-index/*' \
+      -not -path '*/.venv/*' \
+      -not -path '*/venv/*' \
+      -not -path '*/.env/*' \
+      -not -path '*/env/*' \
+      -not -path '*/.tox/*' \
+      -not -path '*/.mypy_cache/*' \
+      -not -path '*/.pytest_cache/*' \
+      -not -path '*/.ruff_cache/*' \
+      -not -path '*/*.egg-info/*' \
       2>/dev/null | sort | while IFS= read -r d; do
         rel="${d#$REPO_ROOT}"
         [ -z "$rel" ] && { echo "."; continue; }
@@ -155,7 +204,9 @@ SYMBOLS="$INDEX_DIR/symbols.txt"
     "$REPO_ROOT" \
     --exclude-dir=node_modules \
     --exclude-dir=.next \
-    --exclude-dir=dist 2>/dev/null | while IFS= read -r line; do
+    --exclude-dir=dist \
+    --exclude-dir=.venv \
+    --exclude-dir=venv 2>/dev/null | while IFS= read -r line; do
       file_line="${line%%:*}"
       rest="${line#*:}"
       lineno="${rest%%:*}"
@@ -171,7 +222,9 @@ SYMBOLS="$INDEX_DIR/symbols.txt"
     "$REPO_ROOT" \
     --exclude-dir=node_modules \
     --exclude-dir=.next \
-    --exclude-dir=dist 2>/dev/null | while IFS= read -r line; do
+    --exclude-dir=dist \
+    --exclude-dir=.venv \
+    --exclude-dir=venv 2>/dev/null | while IFS= read -r line; do
       file_line="${line%%:*}"
       rest="${line#*:}"
       lineno="${rest%%:*}"
@@ -187,7 +240,9 @@ SYMBOLS="$INDEX_DIR/symbols.txt"
     "$REPO_ROOT" \
     --exclude-dir=node_modules \
     --exclude-dir=.next \
-    --exclude-dir=dist 2>/dev/null | while IFS= read -r line; do
+    --exclude-dir=dist \
+    --exclude-dir=.venv \
+    --exclude-dir=venv 2>/dev/null | while IFS= read -r line; do
       file_line="${line%%:*}"
       rest="${line#*:}"
       lineno="${rest%%:*}"
@@ -208,7 +263,9 @@ SYMBOLS="$INDEX_DIR/symbols.txt"
     "$REPO_ROOT" \
     --exclude-dir=node_modules \
     --exclude-dir=.next \
-    --exclude-dir=dist 2>/dev/null | while IFS= read -r line; do
+    --exclude-dir=dist \
+    --exclude-dir=.venv \
+    --exclude-dir=venv 2>/dev/null | while IFS= read -r line; do
       file_line="${line%%:*}"
       rest="${line#*:}"
       lineno="${rest%%:*}"
@@ -243,7 +300,9 @@ SYMBOLS="$INDEX_DIR/symbols.txt"
   grep -rn --include='*.go' \
     -E '^\s*(func|type)\s+' \
     "$REPO_ROOT" \
-    --exclude-dir=vendor 2>/dev/null | while IFS= read -r line; do
+    --exclude-dir=vendor \
+    --exclude-dir=.venv \
+    --exclude-dir=venv 2>/dev/null | while IFS= read -r line; do
       file_line="${line%%:*}"
       rest="${line#*:}"
       lineno="${rest%%:*}"
@@ -260,7 +319,9 @@ SYMBOLS="$INDEX_DIR/symbols.txt"
   grep -rn --include='*.rs' \
     -E '^\s*(pub\s+)?(fn|struct|enum|trait|impl)\s+[a-zA-Z_]\w*' \
     "$REPO_ROOT" \
-    --exclude-dir=target 2>/dev/null | while IFS= read -r line; do
+    --exclude-dir=target \
+    --exclude-dir=.venv \
+    --exclude-dir=venv 2>/dev/null | while IFS= read -r line; do
       file_line="${line%%:*}"
       rest="${line#*:}"
       lineno="${rest%%:*}"
@@ -294,7 +355,9 @@ DEPS="$INDEX_DIR/dependencies.txt"
     "$REPO_ROOT" \
     --exclude-dir=node_modules \
     --exclude-dir=.next \
-    --exclude-dir=dist 2>/dev/null | while IFS= read -r line; do
+    --exclude-dir=dist \
+    --exclude-dir=.venv \
+    --exclude-dir=venv 2>/dev/null | while IFS= read -r line; do
       file="${line%%:*}"
       rel="${file#$REPO_ROOT/}"
       module=$(echo "$line" | grep -oE "from\s+['\"][^'\"]+['\"]" | grep -oE "['\"][^'\"]+['\"]" | tr -d "'" | tr -d '"' | head -1)
